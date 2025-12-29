@@ -7,6 +7,8 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -20,6 +22,9 @@ type Item struct {
 }
 
 func main() {
+	gracefulShutdown := make(chan os.Signal, 1)
+	signal.Notify(gracefulShutdown, syscall.SIGTERM, syscall.SIGINT)
+
 	if err := godotenv.Load(); err != nil {
 		slog.Error("Error loading environment variables")
 		os.Exit(1)
@@ -82,6 +87,27 @@ func main() {
 		w.Write(marshalledItems)
 	})
 
-	slog.Info("Server listening on port :8080")
-	http.ListenAndServe(":8080", nil)
+	server := http.Server{Addr: ":8080", Handler: http.DefaultServeMux}
+
+	go func() {
+		slog.Info("Server listening on port :8080")
+		server.ListenAndServe()
+	}()
+
+	// Wait for signal to clean up and exit gracefully
+	<-gracefulShutdown
+
+	slog.Info("Exit signal recieved!")
+
+	// exit within a 10 second time limit
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// shutdown server gracefully
+	server.Shutdown(ctx)
+
+	// close database connection
+	conn.Close(ctx)
+
+	slog.Info("Server has been shutdown gracefully")
 }
