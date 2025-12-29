@@ -32,6 +32,17 @@ func main() {
 	}
 	defer conn.Close(context.Background())
 
+	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		slog.Info("API Health Check Pinged!")
+		if err := conn.Ping(context.Background()); err != nil {
+			slog.Error("DB ping failed!", "err", err)
+			w.WriteHeader(http.StatusServiceUnavailable)
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
+	})
+
 	http.HandleFunc("/ping", func(w http.ResponseWriter, r *http.Request) {
 		slog.Info("Was Pinged!")
 		newItem := fmt.Sprintf("I Love God - %s", time.Now().Format(time.DateTime))
