@@ -3,6 +3,10 @@ services:
   app:
     build: .
     restart: always
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.app.rule=Host(`localhost`)"
+      - "traefik.http.services.app.loadbalancer.server.port=8080"
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://localhost:8080/health" ]
       interval: 3s
@@ -21,15 +25,24 @@ services:
     volumes:
       - dockerpractice:/var/lib/postgresql/data
       - ./dump.sql:/docker-entrypoint-initdb.d/dump.sql
-  nginx:
-    image: nginx
+  proxy:
+    image: traefik:v3.6.2
+    command:
+      - --providers.docker
+      - --entrypoints.web.address=:80
     ports:
-      - 8080:8080
-    depends_on:
-      - app
-      - db
+      - 8080:80
     volumes:
-      - ./nginx.conf:/etc/nginx/conf.d/nginx.conf:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+  # nginx:
+  #   image: nginx
+  #   ports:
+  #     - 8080:8080
+  #   depends_on:
+  #     - app
+  #     - db
+  #   volumes:
+  #     - ./nginx.conf:/etc/nginx/conf.d/nginx.conf:ro
 
 volumes:
   dockerpractice:
