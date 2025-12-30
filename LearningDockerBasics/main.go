@@ -11,7 +11,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type Item struct {
@@ -21,19 +21,23 @@ type Item struct {
 }
 
 func main() {
+	hostname, err := os.Hostname()
+	if err != nil {
+		slog.Error("Error getting container hostname", "err", err)
+	}
+
 	gracefulShutdown := make(chan os.Signal, 1)
 	signal.Notify(gracefulShutdown, syscall.SIGTERM, syscall.SIGINT)
 
-	conn, err := pgx.Connect(context.Background(), os.Getenv("DATABASE_URL"))
+	dbpool, err := pgxpool.New(context.Background(), os.Getenv("DATABASE_URL"))
 	if err != nil {
 		slog.Error("Error connecting to database: DockerPractice", "err", err)
 		os.Exit(1)
 	}
-	defer conn.Close(context.Background())
 
 	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
-		slog.Info("API Health Check Pinged!")
-		if err := conn.Ping(context.Background()); err != nil {
+		slog.Info(fmt.Sprint(hostname, "health Check Pinged!"))
+		if err := dbpool.Ping(context.Background()); err != nil {
 			slog.Error("DB ping failed!", "err", err)
 			w.WriteHeader(http.StatusServiceUnavailable)
 			return
@@ -43,15 +47,15 @@ func main() {
 	})
 
 	http.HandleFunc("/ping", func(w http.ResponseWriter, r *http.Request) {
-		slog.Info("Was Pinged!")
+		slog.Info(fmt.Sprint(hostname, "was Pinged!"))
 		newItem := fmt.Sprintf("I Love God - %s", time.Now().Format(time.DateTime))
-		_, err := conn.Exec(context.Background(), "INSERT INTO ITEMS (name, created_at) VALUES ($1, $2)", newItem, time.Now())
+		_, err := dbpool.Exec(context.Background(), "INSERT INTO ITEMS (name, created_at) VALUES ($1, $2)", newItem, time.Now())
 		if err != nil {
 			slog.Error("Error writing to DB", "err", err)
 			os.Exit(1)
 		}
 
-		rows, err := conn.Query(context.Background(), "SELECT * FROM ITEMS")
+		rows, err := dbpool.Query(context.Background(), "SELECT * FROM ITEMS")
 		if err != nil {
 			slog.Error("Error reading from DB", "err", err)
 			os.Exit(1)
@@ -97,11 +101,11 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
+	// close database connection
+	dbpool.Close()
+
 	// shutdown server gracefully
 	server.Shutdown(ctx)
 
-	// close database connection
-	conn.Close(ctx)
-
-	slog.Info("Server has been shutdown gracefully")
+	slog.Info(fmt.Sprint(hostname, "has been shutdown gracefully"))
 }
