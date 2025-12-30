@@ -22,9 +22,6 @@ WORKDIR /app
 #Copy executable from first stage to this stage
 COPY --from=build /app/server .
 
-#Copy .env file between stages
-COPY --from=build /app/.env .
-
 #Expose 8080 port
 EXPOSE 8080
 

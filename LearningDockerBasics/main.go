@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/joho/godotenv"
 )
 
 type Item struct {
@@ -24,11 +23,6 @@ type Item struct {
 func main() {
 	gracefulShutdown := make(chan os.Signal, 1)
 	signal.Notify(gracefulShutdown, syscall.SIGTERM, syscall.SIGINT)
-
-	if err := godotenv.Load(); err != nil {
-		slog.Error("Error loading environment variables")
-		os.Exit(1)
-	}
 
 	conn, err := pgx.Connect(context.Background(), os.Getenv("DATABASE_URL"))
 	if err != nil {

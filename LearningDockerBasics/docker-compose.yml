@@ -10,12 +10,14 @@ services:
       interval: 3s
       timeout: 3s
       retries: 5
+    env_file:
+      - .env
     depends_on:
       - db
   db:
     image: postgres:14.18
     environment:
-      - POSTGRES_PASSWORD=greenbay7
+      - POSTGRES_PASSWORD=mockpassword123
       - POSTGRES_USER=tylerarciniaga
       - POSTGRES_DB=DockerPractice
     volumes:
